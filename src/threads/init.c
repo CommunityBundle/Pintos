@@ -28,6 +28,8 @@
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
+#include "vm/frametable.h"
+#include "vm/swap.h"
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -37,6 +39,7 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
@@ -98,7 +101,7 @@ main (void)
   palloc_init (user_page_limit);
   malloc_init ();
   paging_init ();
-
+  printf("Adding something");
   /* Segmentation. */
 #ifdef USERPROG
   tss_init ();
@@ -113,6 +116,7 @@ main (void)
 #ifdef USERPROG
   exception_init ();
   syscall_init ();
+  frametable_init ();
 #endif
 
   /* Start thread scheduler and enable interrupts. */
@@ -125,6 +129,10 @@ main (void)
   ide_init ();
   locate_block_devices ();
   filesys_init (format_filesys);
+#endif
+
+#ifdef USERPROG
+  swap_init ();
 #endif
 
   printf ("Boot complete.\n");
@@ -427,3 +435,58 @@ locate_block_device (enum block_type role, const char *name)
     }
 }
 #endif
+/*Detailed Explanation of Key Functions
+1. main
+
+The entry point for the Pintos kernel. Performs the following steps:
+
+    Memory System Setup:
+        Clears the BSS segment (uninitialized global/static variables).
+        Sets up paging and physical memory allocation.
+    Command-Line Parsing:
+        Reads and parses the kernel command-line arguments.
+    System Initialization:
+        Initializes threads, locks, console I/O, interrupts, timers, keyboard input, and other devices.
+    File System Initialization (if enabled):
+        Configures block devices and initializes the file system (optional format based on command-line arguments).
+    Task Execution:
+        Executes user-defined actions or tests (e.g., running a program or kernel test).
+
+2. bss_init
+
+Clears the BSS (Block Started by Symbol) segment. This segment holds uninitialized global and static variables, which are required to be zeroed before use.
+3. paging_init
+
+Initializes virtual memory paging:
+
+    Creates and sets up the page directory and page tables for the kernel.
+    Maps physical memory to kernel virtual memory.
+    Activates the paging mechanism by setting the CR3 register.
+
+4. read_command_line
+
+Reads and parses the command-line arguments passed during kernel boot. These arguments are stored in the loader's memory and are extracted as an array of strings.
+5. parse_options
+
+Parses command-line options to configure the kernel:
+
+    Handles flags like -q (power off), -f (format the file system), -rs (set random seed), -mlfqs (enable multi-level feedback queue scheduler), and more.
+    Configures system components based on the parsed options.
+
+6. run_actions
+
+Executes the tasks specified in the command-line arguments:
+
+    Identifies the specified action (e.g., run a program, list files) from the actions table.
+    Verifies the required arguments and invokes the corresponding function.
+
+7. File System-Related Functions (Conditional)
+
+If the file system is enabled:
+
+    locate_block_devices: Configures block devices for specific roles (file system, scratch, swap).
+    locate_block_device: Finds and sets the block device based on its name or type.
+
+8. Usage and Help (usage)
+
+Displays a help message for available options and actions, then powers off the system.*/
